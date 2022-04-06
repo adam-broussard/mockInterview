@@ -18,6 +18,8 @@ def generate_users():
     clean_data = create_clean_user_data(user_parameters)
     noisy_data = add_noise(clean_data)
 
+    return noisy_data
+
 
 def generate_user_parameters(number_of_users = 1000, mu1 = 4, sigma1 = 2, mu2 = 5, sigma2 = 3):
 
