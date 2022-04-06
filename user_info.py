@@ -5,6 +5,13 @@ import pandas as pd
 from tqdm import tqdm
 
 
+def save_users(filename = 'clickdata.csv'):
+
+    userdata = generate_users()
+    userdata.to_csv(filename, index = False)
+
+
+
 def generate_users():
 
     user_parameters = generate_user_parameters()
