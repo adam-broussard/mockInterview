@@ -20,8 +20,8 @@ def generate_users():
     return noisy_data
 
 
-def generate_user_parameters(number_of_users=1000, mu1=4, sigma1=2, mu2=5,
-                             sigma2=3):
+def generate_user_parameters(number_of_users=1000, mu1=15, sigma1=6, mu2=16,
+                             sigma2=7):
 
     # The purpose of this file is to generate a list of users with unique id's
     # and assign them an average number of interactions for the two software
@@ -44,14 +44,9 @@ def generate_user_parameters(number_of_users=1000, mu1=4, sigma1=2, mu2=5,
     return user_parameters
 
 
-def create_clean_user_data(user_parameters, total_logins=50000):
+def create_clean_user_data(user_parameters, total_logins=10000):
 
     np.random.seed(101)
-
-    # Create a baseline dataframe that contains user interactions
-
-    # Set the number of times each user logs in
-
     unique_users = np.unique(user_parameters['UID'])
     number_of_users = len(unique_users)
     user_logins = np.random.poisson(
@@ -71,8 +66,16 @@ def create_clean_user_data(user_parameters, total_logins=50000):
     userdata['msg'] = 'Login'
     userdata = userdata.sort_values('timestamp').reset_index(drop=True)
 
-    orig_userdata = userdata.loc[:int(len(userdata)/2)]
-    test_userdata = userdata.loc[int(len(userdata)/2):]
+    orig_userdata = (userdata
+                     .groupby('UID', group_keys=False)
+                     .apply(lambda x: x.sample(frac=0.5)))
+    test_userdata = userdata.drop(orig_userdata.index)
+
+    orig_userdata.sort_index(inplace=True)
+    test_userdata.sort_index(inplace=True)
+
+    # orig_userdata = userdata.loc[:int(len(userdata)/2)]
+    # test_userdata = userdata.loc[int(len(userdata)/2):]
 
     # Generate interactions
 
@@ -88,19 +91,31 @@ def create_clean_user_data(user_parameters, total_logins=50000):
 
             this_user_avg = user_parameters[user_parameters.UID ==
                                             this_login.UID]['avg_' + thiskey]
-            num_interactions = np.random.poisson(lam=this_user_avg)[0]
+
+            login_time = this_login.timestamp.to_datetime64()
+            logout_time = (login_time + (np.random.random()
+                                         * np.timedelta64(int(86400/2), 's')))
+            duration_secs = ((logout_time-login_time)
+                             .astype('timedelta64[s]')
+                             .astype(int))
+
+            user_interactions = (this_user_avg*duration_secs/86400.)
+            num_interactions = np.random.poisson(lam=user_interactions)[0]
 
             # breakpoint()
             times = (this_login.timestamp.to_datetime64()
-                     + (np.random.random(size=num_interactions + 1)
-                        * np.timedelta64(int(86400/2), 's')))
+                     + (np.random.random(size=num_interactions)
+                        * np.timedelta64(duration_secs, 's')))
             times.sort()
+            times = np.append(times, logout_time)
             msgs = ['record_click' for this_time in times[:-1]]
             msgs.append('Logout')
 
             new_data['UID'].append([this_login.UID, ]*(num_interactions+1))
             new_data['msg'].append(msgs)
             new_data['timestamp'].append(times)
+
+            # breakpoint()
 
             # temp = pd.DataFrame.from_dict({'timestamp':times,
             #                                'msg':msgs,
